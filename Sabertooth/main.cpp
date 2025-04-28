@@ -9,6 +9,7 @@
 #include <string>
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
+#include <ctime>
 
 GLuint buildingTexture;
 GLuint player1Texture;
@@ -29,6 +30,8 @@ GLuint player2WinsTexture;
 int winWidth, winHeight;
 bool victoryScreenActive = false;
 GLuint currentVictoryTexture;
+bool showTrajectory = false;
+
 
 
 
@@ -233,14 +236,12 @@ void setupBuildings() {
     buildings.clear();
     int buildingWidth = 50;
     int spacing = 10;
-    int safeZone = 60; // Nova distância mínima de segurança dos jogadores
 
-    // Gera prédios apenas entre player1 + safeZone e player2 - safeZone
-    for (int x = player1.x + safeZone; x < player2.x - safeZone - buildingWidth; x += buildingWidth + spacing) {
+    for (int x = 0; x < WIDTH; x += buildingWidth + spacing) {
         Building b;
         b.x = x;
         b.width = buildingWidth;
-        b.height = 100 + rand() % 200;  // altura aleatória
+        b.height = 50 + rand() % (HEIGHT / 2); // altura entre 50 e metade da tela
         b.y = 0;
 
         b.textureID = loadTexture("images/building.png", b.texWidth, b.texHeight);
@@ -249,7 +250,33 @@ void setupBuildings() {
     }
 }
 
+void setupPlayers() {
+    std::vector<Building*> leftBuildings;
+    std::vector<Building*> rightBuildings;
 
+    for (auto& building : buildings) {
+        if (building.x < WIDTH / 2) {
+            leftBuildings.push_back(&building);
+        }
+        else {
+            rightBuildings.push_back(&building);
+        }
+    }
+
+    if (!leftBuildings.empty()) {
+        int idx = rand() % leftBuildings.size();
+        Building* selected = leftBuildings[idx];
+        player1.x = selected->x + selected->width / 2.0f;
+        player1.y = selected->height + (HEIGHT * 0.05f);
+    }
+
+    if (!rightBuildings.empty()) {
+        int idx = rand() % rightBuildings.size();
+        Building* selected = rightBuildings[idx];
+        player2.x = selected->x + selected->width / 2.0f;
+        player2.y = selected->height + (HEIGHT * 0.05f);
+    }
+}
 
 void setup()
 {
@@ -261,6 +288,7 @@ void setup()
     glMatrixMode(GL_MODELVIEW);
 
     setupBuildings();
+    setupPlayers();
 
     player1.textureID = loadTexture("images/player1.png", player1.texWidth, player1.texHeight);
     player2.textureID = loadTexture("images/player2.png", player2.texWidth, player2.texHeight);
@@ -412,7 +440,7 @@ void renderTextSimple(float x, float y, const std::string &text)
     }
 }
 
-void drawPlayer(Player& player, float screenHeightPercent = 0.10f) {
+void drawPlayer(Player& player, float screenHeightPercent = 0.15f) {
     // Queremos que o jogador tenha screenHeightPercent% da altura da tela
     float desiredHeight = HEIGHT * screenHeightPercent;
 
@@ -430,6 +458,31 @@ void drawPlayer(Player& player, float screenHeightPercent = 0.10f) {
 }
 
 
+void drawTrajectory()
+{
+    float angleRad = (player1Turn ? inputAngle : (180 - inputAngle)) * 3.14159265f / 180.0f;
+    float vX = cos(angleRad) * inputForce * 2.5f;
+    float vY = sin(angleRad) * inputForce * 2.5f;
+
+    float projX = player1Turn ? player1.x : player2.x;
+    float projY = player1Turn ? player1.y : player2.y;
+
+    glColor3f(1.0f, 0.0f, 0.0f); // vermelho
+
+    glBegin(GL_LINE_STRIP);
+    for (float t = 0.0f; t < 5.0f; t += 0.1f)
+    {
+        float x = projX + vX * t;
+        float y = projY + vY * t - 0.5f * GRAVITY * t * t;
+        glVertex2f(x, y);
+
+        if (x < 0 || x > WIDTH || y < 0 || y > HEIGHT)
+            break;
+    }
+    glEnd();
+
+    glColor3f(1.0f, 1.0f, 1.0f); // <<< volta para branco depois
+}
 
 void render()
 {
@@ -519,11 +572,19 @@ void render()
     // Desenhar os textos de labels
     renderTextSimple(220, HEIGHT - 27, "Angulo");
     renderTextSimple(220, HEIGHT - 47, "Forca");
+
+    if (showTrajectory && !isProjectileMoving && !hitActive && !victoryScreenActive)
+    {
+        drawTrajectory();
+    }
+
 }
+
 
 
 int main()
 {
+    srand(time(0));
     if (!glfwInit())
     {
         std::cerr << "Erro ao iniciar GLFW" << std::endl;
@@ -549,6 +610,19 @@ int main()
         float currentTime = glfwGetTime();
         float deltaTime = currentTime - lastTime;
         lastTime = currentTime;
+
+        static bool fKeyPressed = false;
+
+        if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS) {
+            if (!fKeyPressed) {
+                showTrajectory = !showTrajectory; // alterna
+                fKeyPressed = true;
+            }
+        }
+        if (glfwGetKey(window, GLFW_KEY_F) == GLFW_RELEASE) {
+            fKeyPressed = false;
+        }
+
 
         if (!isProjectileMoving && !gameOver)
         {
