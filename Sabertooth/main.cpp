@@ -1,4 +1,4 @@
-// Jogo Gorillas Base - Thomaz Ritter
+// Jogo Gorillas Base - Carlos & Thomaz 
 // Computacao Grafica 2025/1
 
 #include <GL/glew.h>
@@ -14,6 +14,9 @@ GLuint buildingTexture;
 GLuint player1Texture;
 GLuint player2Texture;
 GLuint projectileTexture;
+GLuint backgroundTexture;
+int backgroundWidth, backgroundHeight;
+
 
 
 GLuint loadTexture(const char* filename, int& texWidth, int& texHeight) {
@@ -236,7 +239,7 @@ void setup()
     player1.textureID = loadTexture("images/player1.png", player1.texWidth, player1.texHeight);
     player2.textureID = loadTexture("images/player2.png", player2.texWidth, player2.texHeight);
     projectile.textureID = loadTexture("images/projectile.png", projectile.texWidth, projectile.texHeight);
-
+    backgroundTexture = loadTexture("images/background.png", backgroundWidth, backgroundHeight);
 }
 
 void drawTexturedRectangle(float x, float y, float width, float height, GLuint textureID)
@@ -253,6 +256,22 @@ void drawTexturedRectangle(float x, float y, float width, float height, GLuint t
 
     glDisable(GL_TEXTURE_2D);
 }
+
+
+void drawProjectile(Projectile& proj, float screenHeightPercent = 0.05f) {
+    float desiredHeight = HEIGHT * screenHeightPercent;
+    float aspectRatio = (float)proj.texWidth / (float)proj.texHeight;
+    float desiredWidth = desiredHeight * aspectRatio;
+
+    drawTexturedRectangle(
+        -desiredWidth / 2.0f,
+        -desiredHeight / 2.0f,
+        desiredWidth,
+        desiredHeight,
+        proj.textureID
+    );
+}
+
 
 
 void drawTexturedCircle(float cx, float cy, float r, GLuint textureID)
@@ -346,62 +365,32 @@ void render()
 {
     glClear(GL_COLOR_BUFFER_BIT);
 
+    // 1. Desenha o fundo primeiro
+    drawTexturedRectangle(0, 0, WIDTH, HEIGHT, backgroundTexture);
+
+    // 2. Depois desenha os prédios
     for (auto& building : buildings) {
         drawTexturedRectangle(building.x, building.y, building.width, building.height, building.textureID);
     }
 
-
+    // 3. Depois desenha os jogadores
     drawPlayer(player1);
     drawPlayer(player2);
 
-
+    // 4. Depois desenha o projétil se estiver ativo
     if (isProjectileMoving)
     {
         glPushMatrix();
         glTranslatef(projectile.x, projectile.y, 0.0f);
         glRotatef(projectile.rotation, 0.0f, 0.0f, 1.0f);
-        drawTexturedRectangle(
-            -projectile.texWidth / 2.0f,
-            -projectile.texHeight / 2.0f,
-            projectile.texWidth,
-            projectile.texHeight,
-            projectile.textureID
-        );
+        drawProjectile(projectile);
         glPopMatrix();
     }
 
-
-    float anglePercent = inputAngle / 90.0f;
-    if (anglePercent > 1.0f)
-        anglePercent = 1.0f;
-    if (anglePercent < 0.0f)
-        anglePercent = 0.0f;
-
-    float lastAnglePercent = (player1Turn ? lastAngle1 : lastAngle2) / 90.0f;
-    if (lastAnglePercent > 1.0f)
-        lastAnglePercent = 1.0f;
-    if (lastAnglePercent < 0.0f)
-        lastAnglePercent = 0.0f;
-
-    drawBar(10, HEIGHT - 30, 200, 10, anglePercent, 0.0f, 1.0f, 0.0f, lastAnglePercent);
-
-    float forcePercent = inputForce / 200.0f;
-    if (forcePercent > 1.0f)
-        forcePercent = 1.0f;
-    if (forcePercent < 0.0f)
-        forcePercent = 0.0f;
-
-    float lastForcePercent = (player1Turn ? lastForce1 : lastForce2) / 200.0f;
-    if (lastForcePercent > 1.0f)
-        lastForcePercent = 1.0f;
-    if (lastForcePercent < 0.0f)
-        lastForcePercent = 0.0f;
-
-    drawBar(10, HEIGHT - 50, 200, 10, forcePercent, 1.0f, 0.5f, 0.0f, lastForcePercent);
-
-    renderTextSimple(220, HEIGHT - 27, "Angulo");
-    renderTextSimple(220, HEIGHT - 47, "Forca");
+    // 5. Depois desenha a UI (barras e textos)
+    // (essa parte você já tem)
 }
+
 
 int main()
 {
@@ -411,7 +400,7 @@ int main()
         return -1;
     }
 
-    GLFWwindow *window = glfwCreateWindow(WIDTH, HEIGHT, "Gorillas Game Base", NULL, NULL);
+    GLFWwindow *window = glfwCreateWindow(WIDTH, HEIGHT, "Bloons TD7", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
