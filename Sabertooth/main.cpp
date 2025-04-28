@@ -16,36 +16,37 @@ GLuint player2Texture;
 GLuint projectileTexture;
 
 
-void loadTextureAndMask(const char* filename, GLuint& textureID, std::vector<unsigned char>& mask, int& texWidth, int& texHeight) {
+GLuint loadTexture(const char* filename, int& texWidth, int& texHeight) {
     int width, height, nrChannels;
+    stbi_set_flip_vertically_on_load(false); // Não flipar na carga
     unsigned char* data = stbi_load(filename, &width, &height, &nrChannels, 0);
-    if (data) {
-        GLenum format = (nrChannels == 4) ? GL_RGBA : GL_RGB;
-
-        glGenTextures(1, &textureID);
-        glBindTexture(GL_TEXTURE_2D, textureID);
-        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-        texWidth = width;
-        texHeight = height;
-
-        if (nrChannels == 4) {
-            mask.resize(width * height);
-            for (int i = 0; i < width * height; ++i) {
-                mask[i] = data[i * 4 + 3];  // salva o canal alpha
-            }
-        }
-
-        stbi_image_free(data);
-    }
-    else {
+    if (!data) {
         std::cout << "Falha ao carregar " << filename << std::endl;
+        exit(1);
     }
+
+    GLenum format = (nrChannels == 4) ? GL_RGBA : GL_RGB;
+
+    GLuint textureID;
+    glGenTextures(1, &textureID);
+    glBindTexture(GL_TEXTURE_2D, textureID);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    stbi_image_free(data);
+
+    texWidth = width;
+    texHeight = height;
+
+    return textureID;
 }
+
+
 
 
 
@@ -70,33 +71,26 @@ float lastAngle2 = 45.0f;
 float lastForce2 = 100.0f;
 
 // Estruturas para jogadores e projétil
-struct Player
-{
+struct Player {
     float x, y;
     GLuint textureID;
     int texWidth, texHeight;
-    std::vector<unsigned char> alphaMask; // novo campo
 };
 
-struct Building
-{
+struct Building {
     float x, y, width, height;
     GLuint textureID;
     int texWidth, texHeight;
-    std::vector<unsigned char> alphaMask; // novo campo
 };
 
-struct Projectile
-{
+struct Projectile {
     float x, y;
     float velocityX, velocityY;
     float angle;
     float force;
-    GLuint textureID;                      // << textura do projétil
-    int texWidth, texHeight;                // << dimensões da textura
-    std::vector<unsigned char> alphaMask;   // << se quiser no futuro checar colisão pixel-perfect
+    GLuint textureID;
+    int texWidth, texHeight;
 };
-
 
 Player player1 = {100.0f, 100.0f};
 Player player2 = {700.0f, 100.0f};
@@ -173,37 +167,32 @@ bool checkCollision(Player player, Projectile proj)
 }
 
 bool checkPixelCollision(Player& player, Projectile& proj) {
-    int localX = (int)((proj.x - (player.x - 15)) / (30.0f) * player.texWidth);
-    int localY = (int)((proj.y - (player.y - 15)) / (30.0f) * player.texHeight);
+    float halfWidth = player.texWidth / 2.0f;
+    float halfHeight = player.texHeight / 2.0f;
 
-    if (localX >= 0 && localX < player.texWidth && localY >= 0 && localY < player.texHeight) {
-        int idx = (localY * player.texWidth) + localX;
-        return player.alphaMask[idx] > 128;  // se alpha significativo
+    if (proj.x >= player.x - halfWidth && proj.x <= player.x + halfWidth &&
+        proj.y >= player.y - halfHeight && proj.y <= player.y + halfHeight)
+    {
+        return true;
     }
     return false;
 }
+
 
 
 bool checkBuildingCollision(Projectile proj)
 {
     for (auto& building : buildings)
     {
-        if (proj.x >= building.x && proj.x <= (building.x + building.width) &&
-            proj.y >= building.y && proj.y <= (building.y + building.height))
+        if (proj.x >= building.x && proj.x <= building.x + building.width &&
+            proj.y >= building.y && proj.y <= building.y + building.height)
         {
-            // Está dentro do retângulo geral — agora checar alpha!
-            int localX = (int)(((proj.x - building.x) / building.width) * building.texWidth);
-            int localY = (int)(((proj.y - building.y) / building.height) * building.texHeight);
-
-            if (localX >= 0 && localX < building.texWidth && localY >= 0 && localY < building.texHeight)
-            {
-                int idx = (localY * building.texWidth) + localX;
-                return building.alphaMask[idx] > 128;  // se o alpha é significativo
-            }
+            return true;
         }
     }
     return false;
 }
+
 
 
 
@@ -221,7 +210,7 @@ void setupBuildings() {
         b.height = 100 + rand() % 200;  // altura aleatória
         b.y = 0;
 
-        loadTextureAndMask("images/building.png", b.textureID, b.alphaMask, b.texWidth, b.texHeight);
+        b.textureID = loadTexture("images/building.png", b.texWidth, b.texHeight);
 
         buildings.push_back(b);
     }
@@ -232,15 +221,17 @@ void setupBuildings() {
 void setup()
 {
     glMatrixMode(GL_PROJECTION);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glLoadIdentity();
     glOrtho(0, WIDTH, 0, HEIGHT, -1, 1);
     glMatrixMode(GL_MODELVIEW);
 
     setupBuildings();
 
-    loadTextureAndMask("images/player1.png", player1.textureID, player1.alphaMask, player1.texWidth, player1.texHeight);
-    loadTextureAndMask("images/player2.png", player2.textureID, player2.alphaMask, player2.texWidth, player2.texHeight);
-    loadTextureAndMask("images/projectile.png", projectile.textureID, projectile.alphaMask, projectile.texWidth, projectile.texHeight);
+    player1.textureID = loadTexture("images/player1.png", player1.texWidth, player1.texHeight);
+    player2.textureID = loadTexture("images/player2.png", player2.texWidth, player2.texHeight);
+    projectile.textureID = loadTexture("images/projectile.png", projectile.texWidth, projectile.texHeight);
 
 }
 
@@ -324,6 +315,25 @@ void renderTextSimple(float x, float y, const std::string &text)
     }
 }
 
+void drawPlayer(Player& player, float screenHeightPercent = 0.10f) {
+    // Queremos que o jogador tenha screenHeightPercent% da altura da tela
+    float desiredHeight = HEIGHT * screenHeightPercent;
+
+    // Mantém a proporção da textura original
+    float aspectRatio = (float)player.texWidth / (float)player.texHeight;
+    float desiredWidth = desiredHeight * aspectRatio;
+
+    drawTexturedRectangle(
+        player.x - desiredWidth / 2.0f,
+        player.y - desiredHeight / 2.0f,
+        desiredWidth,
+        desiredHeight,
+        player.textureID
+    );
+}
+
+
+
 void render()
 {
     glClear(GL_COLOR_BUFFER_BIT);
@@ -333,8 +343,9 @@ void render()
     }
 
 
-    drawTexturedRectangle(player1.x - 15, player1.y - 15, 30, 30, player1.textureID);
-    drawTexturedRectangle(player2.x - 15, player2.y - 15, 30, 30, player2.textureID);
+    drawPlayer(player1);
+    drawPlayer(player2);
+
 
     if (isProjectileMoving)
     {
