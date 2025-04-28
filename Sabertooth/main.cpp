@@ -12,10 +12,25 @@
 
 GLuint buildingTexture;
 GLuint player1Texture;
+GLuint player1AttackTexture;
+float attackAnimationTimer = 0.0f; // Tempo restante da animação
 GLuint player2Texture;
+GLuint player2AttackTexture;
 GLuint projectileTexture;
 GLuint backgroundTexture;
 int backgroundWidth, backgroundHeight;
+GLuint hitTexture;
+int hitWidth, hitHeight;
+bool hitActive = false;
+float hitTimer = 0.0f;
+float hitX = 0.0f, hitY = 0.0f;
+GLuint player1WinsTexture;
+GLuint player2WinsTexture;
+int winWidth, winHeight;
+bool victoryScreenActive = false;
+GLuint currentVictoryTexture;
+
+
 
 
 
@@ -112,6 +127,9 @@ void shootProjectile(float angleDeg, float force)
         projectile.y = player1.y;
         lastAngle1 = inputAngle;
         lastForce1 = inputForce;
+
+        // Muda para animação de ataque
+        player1.textureID = player1AttackTexture;
     }
     else
     {
@@ -119,14 +137,22 @@ void shootProjectile(float angleDeg, float force)
         projectile.y = player2.y;
         lastAngle2 = inputAngle;
         lastForce2 = inputForce;
+
+        // Muda para animação de ataque
+        player2.textureID = player2AttackTexture;
     }
+
     projectile.angle = (player1Turn ? angleDeg : (180 - angleDeg)) * (3.14159265f / 180.0f);
     projectile.force = force;
     projectile.velocityX = cos(projectile.angle) * projectile.force;
     projectile.velocityY = sin(projectile.angle) * projectile.force;
-    projectile.rotation = 0.0f; // zera rotação ao lançar
+    projectile.rotation = 0.0f;
     isProjectileMoving = true;
+
+    // Ativa o timer da animação
+    attackAnimationTimer = 0.5f; // meio segundo
 }
+
 
 
 void drawCircle(float cx, float cy, float r)
@@ -240,6 +266,12 @@ void setup()
     player2.textureID = loadTexture("images/player2.png", player2.texWidth, player2.texHeight);
     projectile.textureID = loadTexture("images/projectile.png", projectile.texWidth, projectile.texHeight);
     backgroundTexture = loadTexture("images/background.png", backgroundWidth, backgroundHeight);
+    hitTexture = loadTexture("images/hit.png", hitWidth, hitHeight);
+    player1WinsTexture = loadTexture("images/player1wins.png", winWidth, winHeight);
+    player2WinsTexture = loadTexture("images/player2wins.png", winWidth, winHeight);
+    player1AttackTexture = loadTexture("images/player12.png", player1.texWidth, player1.texHeight);
+    player2AttackTexture = loadTexture("images/player22.png", player2.texWidth, player2.texHeight);
+
 }
 
 void drawTexturedRectangle(float x, float y, float width, float height, GLuint textureID)
@@ -303,22 +335,32 @@ void update(float deltaTime)
         projectile.y += projectile.velocityY * deltaTime;
         projectile.velocityY -= GRAVITY * deltaTime;
 
-        projectile.rotation += 360.0f * deltaTime; // 360 graus por segundo
+        projectile.rotation += 360.0f * deltaTime;
         if (projectile.rotation >= 360.0f)
             projectile.rotation -= 360.0f;
 
         if (checkCollision(player1Turn ? player2 : player1, projectile))
         {
-            gameOver = true;
             isProjectileMoving = false;
+            hitActive = true;
+            hitTimer = 1.0f;
+            hitX = projectile.x;
+            hitY = projectile.y;
+            gameOver = true;
+
+            // Ativa a tela de vitória após o hit
+            victoryScreenActive = true;
+            currentVictoryTexture = player1Turn ? player1WinsTexture : player2WinsTexture;
         }
+
 
         if (checkBuildingCollision(projectile))
         {
             isProjectileMoving = false;
-            player1Turn = !player1Turn;
-            inputAngle = 45.0f;
-            inputForce = 100.0f;
+            hitActive = true;
+            hitTimer = 1.0f;
+            hitX = projectile.x;
+            hitY = projectile.y;
         }
 
         if (projectile.y <= 0 || projectile.x < 0 || projectile.x > WIDTH)
@@ -329,7 +371,35 @@ void update(float deltaTime)
             inputForce = 100.0f;
         }
     }
+    else if (hitActive)
+    {
+        hitTimer -= deltaTime;
+        if (hitTimer <= 0.0f)
+        {
+            hitActive = false;
+            if (!gameOver)
+            {
+                player1Turn = !player1Turn;
+                inputAngle = 45.0f;
+                inputForce = 100.0f;
+            }
+        }
+    }
+
+    // Atualiza timer de animação de ataque
+    if (attackAnimationTimer > 0.0f)
+    {
+        attackAnimationTimer -= deltaTime;
+        if (attackAnimationTimer <= 0.0f)
+        {
+            // Voltar para textura normal
+            player1.textureID = loadTexture("images/player1.png", player1.texWidth, player1.texHeight);
+            player2.textureID = loadTexture("images/player2.png", player2.texWidth, player2.texHeight);
+        }
+    }
+
 }
+
 
 void renderTextSimple(float x, float y, const std::string &text)
 {
@@ -365,6 +435,30 @@ void render()
 {
     glClear(GL_COLOR_BUFFER_BIT);
 
+    if (victoryScreenActive)
+    {
+        drawTexturedRectangle(0, 0, WIDTH, HEIGHT, backgroundTexture);
+
+        // Cálculo da escala para ajustar a imagem
+        float scaleX = (float)WIDTH / (float)winWidth;
+        float scaleY = (float)HEIGHT / (float)winHeight;
+        float scale = (scaleX < scaleY) ? scaleX : scaleY; // pega o menor para caber inteiro
+
+        float newWidth = winWidth * scale;
+        float newHeight = winHeight * scale;
+
+        drawTexturedRectangle(
+            (WIDTH - newWidth) / 2.0f,
+            (HEIGHT - newHeight) / 2.0f,
+            newWidth,
+            newHeight,
+            currentVictoryTexture
+        );
+
+        return;
+    }
+
+
     // 1. Desenha o fundo primeiro
     drawTexturedRectangle(0, 0, WIDTH, HEIGHT, backgroundTexture);
 
@@ -387,8 +481,44 @@ void render()
         glPopMatrix();
     }
 
-    // 5. Depois desenha a UI (barras e textos)
-    // (essa parte você já tem)
+    if (hitActive)
+    {
+        glPushMatrix();
+        glTranslatef(hitX, hitY, 0.0f);
+        float hitSize = HEIGHT * 0.1f; // 10% da altura da tela
+        drawTexturedRectangle(
+            -hitSize / 2.0f, -hitSize / 2.0f,
+            hitSize, hitSize,
+            hitTexture
+        );
+        glPopMatrix();
+    }
+
+    // 5. Agora desenha a UI (sempre por cima de tudo)
+
+    float anglePercent = inputAngle / 90.0f;
+    if (anglePercent > 1.0f) anglePercent = 1.0f;
+    if (anglePercent < 0.0f) anglePercent = 0.0f;
+
+    float lastAnglePercent = (player1Turn ? lastAngle1 : lastAngle2) / 90.0f;
+    if (lastAnglePercent > 1.0f) lastAnglePercent = 1.0f;
+    if (lastAnglePercent < 0.0f) lastAnglePercent = 0.0f;
+
+    drawBar(10, HEIGHT - 30, 200, 10, anglePercent, 0.0f, 1.0f, 0.0f, lastAnglePercent);
+
+    float forcePercent = inputForce / 200.0f;
+    if (forcePercent > 1.0f) forcePercent = 1.0f;
+    if (forcePercent < 0.0f) forcePercent = 0.0f;
+
+    float lastForcePercent = (player1Turn ? lastForce1 : lastForce2) / 200.0f;
+    if (lastForcePercent > 1.0f) lastForcePercent = 1.0f;
+    if (lastForcePercent < 0.0f) lastForcePercent = 0.0f;
+
+    drawBar(10, HEIGHT - 50, 200, 10, forcePercent, 1.0f, 0.5f, 0.0f, lastForcePercent);
+
+    // Desenhar os textos de labels
+    renderTextSimple(220, HEIGHT - 27, "Angulo");
+    renderTextSimple(220, HEIGHT - 47, "Forca");
 }
 
 
