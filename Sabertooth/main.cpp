@@ -13,6 +13,8 @@
 GLuint buildingTexture;
 GLuint player1Texture;
 GLuint player2Texture;
+GLuint projectileTexture;
+
 
 void loadTextureAndMask(const char* filename, GLuint& textureID, std::vector<unsigned char>& mask, int& texWidth, int& texHeight) {
     int width, height, nrChannels;
@@ -90,7 +92,11 @@ struct Projectile
     float velocityX, velocityY;
     float angle;
     float force;
+    GLuint textureID;                      // << textura do projétil
+    int texWidth, texHeight;                // << dimensões da textura
+    std::vector<unsigned char> alphaMask;   // << se quiser no futuro checar colisão pixel-perfect
 };
+
 
 Player player1 = {100.0f, 100.0f};
 Player player2 = {700.0f, 100.0f};
@@ -234,6 +240,7 @@ void setup()
 
     loadTextureAndMask("images/player1.png", player1.textureID, player1.alphaMask, player1.texWidth, player1.texHeight);
     loadTextureAndMask("images/player2.png", player2.textureID, player2.alphaMask, player2.texWidth, player2.texHeight);
+    loadTextureAndMask("images/projectile.png", projectile.textureID, projectile.alphaMask, projectile.texWidth, projectile.texHeight);
 
 }
 
@@ -326,18 +333,24 @@ void render()
     }
 
 
-    drawTexturedCircle(player1.x, player1.y, 15, player1Texture);
-    drawTexturedCircle(player2.x, player2.y, 15, player2Texture);
+    drawTexturedRectangle(player1.x - 15, player1.y - 15, 30, 30, player1.textureID);
+    drawTexturedRectangle(player2.x - 15, player2.y - 15, 30, 30, player2.textureID);
 
     if (isProjectileMoving)
     {
         glPushMatrix();
         glTranslatef(projectile.x, projectile.y, 0.0f);
         glRotatef(projectile.angle * (180.0f / 3.14159265f), 0.0f, 0.0f, 1.0f);
-        glColor3f(1.0f, 1.0f, 0.0f);
-        drawCircle(0.0f, 0.0f, 5);
+        drawTexturedRectangle(
+            -projectile.texWidth / 2.0f,
+            -projectile.texHeight / 2.0f,
+            projectile.texWidth,
+            projectile.texHeight,
+            projectile.textureID
+        );
         glPopMatrix();
     }
+
 
     float anglePercent = inputAngle / 90.0f;
     if (anglePercent > 1.0f)
