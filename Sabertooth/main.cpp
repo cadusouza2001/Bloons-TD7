@@ -90,7 +90,9 @@ struct Projectile {
     float force;
     GLuint textureID;
     int texWidth, texHeight;
+    float rotation = 0.0f; // << novo: rotação atual do sprite
 };
+
 
 Player player1 = {100.0f, 100.0f};
 Player player2 = {700.0f, 100.0f};
@@ -119,8 +121,10 @@ void shootProjectile(float angleDeg, float force)
     projectile.force = force;
     projectile.velocityX = cos(projectile.angle) * projectile.force;
     projectile.velocityY = sin(projectile.angle) * projectile.force;
+    projectile.rotation = 0.0f; // zera rotação ao lançar
     isProjectileMoving = true;
 }
+
 
 void drawCircle(float cx, float cy, float r)
 {
@@ -280,6 +284,10 @@ void update(float deltaTime)
         projectile.y += projectile.velocityY * deltaTime;
         projectile.velocityY -= GRAVITY * deltaTime;
 
+        projectile.rotation += 360.0f * deltaTime; // 360 graus por segundo
+        if (projectile.rotation >= 360.0f)
+            projectile.rotation -= 360.0f;
+
         if (checkCollision(player1Turn ? player2 : player1, projectile))
         {
             gameOver = true;
@@ -351,7 +359,7 @@ void render()
     {
         glPushMatrix();
         glTranslatef(projectile.x, projectile.y, 0.0f);
-        glRotatef(projectile.angle * (180.0f / 3.14159265f), 0.0f, 0.0f, 1.0f);
+        glRotatef(projectile.rotation, 0.0f, 0.0f, 1.0f);
         drawTexturedRectangle(
             -projectile.texWidth / 2.0f,
             -projectile.texHeight / 2.0f,
