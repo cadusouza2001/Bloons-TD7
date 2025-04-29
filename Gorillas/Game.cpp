@@ -67,14 +67,13 @@ void Game::init()
 void Game::setupBuildings()
 {
     buildings.clear();
-    int spacing = 10;
     int safeZone = 60;
 
-    for (int x = 0; x < WIDTH; x += 50 + spacing)
+    for (int x = 0; x < WIDTH; x += 80)
     {
         Building b;
-        float height = 50 + rand() % (HEIGHT / 2);
-        b.setup(x, 0, 50, height, "images/building.png");
+        float height = 80 + rand() % (HEIGHT / 2);
+        b.setup(x, 0, 80, height, "images/building.png");
         buildings.push_back(b);
     }
 }
@@ -272,9 +271,6 @@ void Game::drawUI()
         lastForcePercent = 0.0f;
 
     drawBar(10, HEIGHT - 50, 200, 10, forcePercent, 1.0f, 0.5f, 0.0f, lastForcePercent);
-
-    renderTextSimple(220, HEIGHT - 27, "Angulo");
-    renderTextSimple(220, HEIGHT - 47, "Forca");
 }
 
 void Game::drawTrajectory()
