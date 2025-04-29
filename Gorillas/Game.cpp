@@ -163,16 +163,12 @@ void Game::update(float deltaTime)
     {
         projectile.update(deltaTime);
 
-        if (projectile.x < 0 || projectile.x > WIDTH || projectile.y < 0)
+        if (isOutOfBounds())
         {
             isProjectileMoving = false;
             resetTurn();
         }
-
-        float distP1 = sqrt(pow(projectile.x - player1.x, 2) + pow(projectile.y - player1.y, 2));
-        float distP2 = sqrt(pow(projectile.x - player2.x, 2) + pow(projectile.y - player2.y, 2));
-
-        if ((player1Turn && distP2 < 30) || (!player1Turn && distP1 < 30))
+        else if (checkCollisionWithPlayers())
         {
             isProjectileMoving = false;
             hitActive = true;
@@ -181,18 +177,13 @@ void Game::update(float deltaTime)
             hitY = projectile.y;
             victoryScreenActive = true;
         }
-
-        for (auto &building : buildings)
+        else if (checkCollisionWithBuildings())
         {
-            if (projectile.x >= building.x && projectile.x <= building.x + building.width &&
-                projectile.y >= building.y && projectile.y <= building.y + building.height)
-            {
-                isProjectileMoving = false;
-                hitActive = true;
-                hitTimer = 1.0f;
-                hitX = projectile.x;
-                hitY = projectile.y;
-            }
+            isProjectileMoving = false;
+            hitActive = true;
+            hitTimer = 1.0f;
+            hitX = projectile.x;
+            hitY = projectile.y;
         }
     }
     else if (hitActive)
@@ -206,6 +197,33 @@ void Game::update(float deltaTime)
         }
     }
 }
+
+bool Game::isOutOfBounds()
+{
+    return projectile.x < 0 || projectile.x > WIDTH || projectile.y < 0;
+}
+
+bool Game::checkCollisionWithPlayers()
+{
+    float distP1 = sqrt(pow(projectile.x - player1.x, 2) + pow(projectile.y - player1.y, 2));
+    float distP2 = sqrt(pow(projectile.x - player2.x, 2) + pow(projectile.y - player2.y, 2));
+    return (player1Turn && distP2 < 30) || (!player1Turn && distP1 < 30);
+}
+
+bool Game::checkCollisionWithBuildings()
+{
+    for (auto& building : buildings)
+    {
+        if (projectile.x >= building.x && projectile.x <= building.x + building.width &&
+            projectile.y >= building.y && projectile.y <= building.y + building.height)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+
 
 void Game::render()
 {

@@ -9,19 +9,20 @@
 #include "Building.h"
 
 // Gerenciador principal do jogo
-class Game {
+class Game
+{
 public:
     Game();
     ~Game();
 
     void init();
-    void processInput(GLFWwindow* window, float deltaTime);
+    void processInput(GLFWwindow *window, float deltaTime);
     void update(float deltaTime);
     void render();
     void run();
 
 private:
-    GLFWwindow* window;
+    GLFWwindow *window;
     static const int WIDTH = 800;
     static const int HEIGHT = 600;
 
@@ -46,7 +47,9 @@ private:
     float lastAngle2, lastForce2;
     float hitX, hitY;
 
-    // Métodos auxiliares
+    bool checkCollisionWithPlayers();
+    bool checkCollisionWithBuildings();
+    bool isOutOfBounds();
     void setupBuildings();
     void setupPlayers();
     void drawUI();
